@@ -17,7 +17,6 @@ def driver():
 
 def test_e2e_login(driver):
     """E2E: Connexion via l'interface."""
-    # L'application DOIT tourner sur ce port
     driver.get("http://127.0.0.1:5000/login")
     
     # Remplir le formulaire avec l'utilisateur qu'on vient de créer
