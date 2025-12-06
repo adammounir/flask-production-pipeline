@@ -1,0 +1,68 @@
+name: Flask CI/CD Pipeline
+
+# Déclencheurs (Triggers) selon le sujet 6.1 et 6.2
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  # Job 1: Qualité du code et Tests (S'exécute partout)
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest flake8 selenium webdriver-manager
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings.
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run Unit and Integration Tests
+        # On utilise le module pytest
+        # On injecte une fausse URL de base de données pour que l'app ne plante pas au démarrage
+        env:
+          DATABASE_URL: "sqlite:///:memory:"
+        run: |
+          pytest tests/test_unit.py tests/test_integration.py
+
+  # Job 2: Docker Build & Push
+  docker-build-push:
+    needs: test-and-lint # N'exécute ceci que si les tests passent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to DockerHub
+        # On se connecte seulement si c'est un push sur Main (pour déployer)
+        # OU si on veut juste vérifier que le login marche
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker Image
+        # On construit l'image pour vérifier qu'elle compile bien (consigne 6.1)
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKERHUB_USERNAME }}/taskmanager:latest
+
+      - name: Push to DockerHub
+        # Consigne 6.2: On pousse SEULEMENT si on est sur la branche 'main'
+        if: github.ref == 'refs/heads/main'
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/taskmanager:latest

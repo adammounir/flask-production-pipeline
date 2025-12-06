@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+.env.production
+venv/
+.pytest_cache/
+.DS_Store
+*.log
+drivers/
